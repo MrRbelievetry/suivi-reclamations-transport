@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#171714">
+  <meta name="description" content="Suivi local des réclamations transport Oriental Discount.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://api.github.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <title>Suivi Réclamations Transport</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css?v=1.1.0">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Oriental Discount</p>
+      <h1>Suivi Réclamations Transport</h1>
+    </div>
+    <div class="privacy"><span aria-hidden="true">●</span> Données synchronisées dans GitHub privé</div>
+  </header>
+
+  <main>
+    <section class="toolbar panel" aria-label="Actions principales">
+      <button id="new-record" class="button primary">＋ Nouvelle réclamation</button>
+      <button id="reload-data" class="button ghost">Synchroniser</button>
+      <label class="search-field"><span>Recherche</span><input id="search" type="search" placeholder="Client, commande, suivi…"></label>
+      <label><span>Statut</span><select id="status-filter"><option>Tous</option><option>En cours</option><option>À relancer</option><option>Résolu</option></select></label>
+      <div class="toolbar-spacer"></div>
+      <details class="data-menu">
+        <summary class="button secondary">Sauvegarde ▾</summary>
+        <div class="menu">
+          <button id="github-settings">Connexion GitHub</button>
+          <button id="export-data">Exporter une copie locale</button>
+          <button id="import-data">Importer une sauvegarde</button>
+          <button id="import-sqlite">Reprendre l’ancienne base .db</button>
+        </div>
+      </details>
+      <input id="backup-file" class="visually-hidden" type="file" accept=".json,application/json">
+      <input id="sqlite-file" class="visually-hidden" type="file" accept=".db,.sqlite,.sqlite3,application/x-sqlite3">
+    </section>
+
+    <section id="stats" class="stats" aria-label="Statistiques"></section>
+
+    <section class="panel templates-bar">
+      <label><span>Message client type</span><select id="template-select"></select></label>
+      <button id="copy-message" class="button secondary">Copier le message</button>
+      <button id="manage-templates" class="button ghost">Gérer les modèles</button>
+    </section>
+
+    <section class="panel table-panel">
+      <div class="section-heading">
+        <div><p class="eyebrow dark">Dossiers</p><h2>Réclamations transport</h2></div>
+        <span id="result-count" class="muted"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Statut</th><th>Client</th><th>Commande</th><th>Transporteur</th><th>Suivi</th><th>Ouvert le</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+          <tbody id="records-body"></tbody>
+        </table>
+      </div>
+      <div id="empty-state" class="empty" hidden>
+        <div aria-hidden="true">⌕</div>
+        <h3>Aucun dossier à afficher</h3>
+        <p>Créez une réclamation ou modifiez les filtres.</p>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="record-dialog">
+    <form id="record-form" method="dialog">
+      <div class="dialog-head"><div><p class="eyebrow dark">Dossier transport</p><h2 id="record-title">Nouvelle réclamation</h2></div><button type="button" class="icon-button close-dialog" aria-label="Fermer">×</button></div>
+      <input id="record-id" type="hidden">
+      <div class="form-grid">
+        <label>Nom client *<input id="client-name" required maxlength="160"></label>
+        <label>N° commande<input id="order-number" maxlength="80"></label>
+        <label>Transporteur<select id="carrier"></select></label>
+        <label>Statut<select id="record-status"></select></label>
+        <label>N° suivi<input id="tracking-number" maxlength="160"></label>
+        <label>Date d’ouverture<input id="opened-date" type="date"></label>
+        <label class="full">Lien de suivi<input id="tracking-url" type="url" placeholder="https://…" maxlength="1000"></label>
+      </div>
+      <section id="history-section" class="history" hidden>
+        <div class="section-heading compact"><h3>Historique des actions</h3></div>
+        <div class="action-entry"><input id="action-date" type="date" aria-label="Date de l’action"><input id="action-text" maxlength="300" placeholder="Action effectuée"><button id="add-action" type="button" class="button secondary">Ajouter</button></div>
+        <ul id="actions-list"></ul>
+      </section>
+      <p id="deletion-note" class="deletion-note" hidden></p>
+      <div class="dialog-actions">
+        <button id="delete-record" type="button" class="button danger" hidden>Supprimer définitivement</button>
+        <div class="toolbar-spacer"></div>
+        <button type="button" class="button ghost close-dialog">Annuler</button>
+        <button type="submit" class="button primary">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="template-dialog">
+    <form id="template-form" method="dialog">
+      <div class="dialog-head"><div><p class="eyebrow dark">Réponses rapides</p><h2>Modèles de messages</h2></div><button type="button" class="icon-button close-template" aria-label="Fermer">×</button></div>
+      <div class="template-layout">
+        <div><label>Modèle<select id="template-manager-select" size="9"></select></label><button id="new-template" type="button" class="button ghost full-button">＋ Nouveau modèle</button></div>
+        <div class="template-editor"><input id="template-id" type="hidden"><label>Nom du modèle<input id="template-title" required maxlength="120"></label><label>Texte<textarea id="template-body" required rows="12"></textarea></label><p class="hint">Variables : {client}, {commande}, {suivi}, {lien_suivi}, {transporteur}</p></div>
+      </div>
+      <div class="dialog-actions"><button id="delete-template" type="button" class="button danger">Supprimer</button><div class="toolbar-spacer"></div><button type="button" class="button ghost close-template">Fermer</button><button type="submit" class="button primary">Enregistrer</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="github-dialog">
+    <form id="github-form" method="dialog">
+      <div class="dialog-head"><div><p class="eyebrow dark">Stockage centralisé</p><h2>Connexion aux données GitHub</h2></div></div>
+      <p class="github-explainer">Les dossiers sont lus et enregistrés dans un dépôt GitHub privé. La clé d’accès reste uniquement en mémoire et sera redemandée après la fermeture de cet onglet.</p>
+      <div class="form-grid">
+        <label>Compte GitHub<input id="github-owner" value="MrRbelievetry" required autocomplete="username"></label>
+        <label>Dépôt privé<input id="github-repo" value="orientaldiscount-suivi-data" required></label>
+        <label class="full">Clé d’accès GitHub<input id="github-token" type="password" required autocomplete="off" placeholder="github_pat_…"></label>
+      </div>
+      <p id="github-error" class="deletion-note" hidden></p>
+      <div class="dialog-actions"><button id="cancel-github" type="button" class="button ghost" hidden>Annuler</button><div class="toolbar-spacer"></div><button id="connect-github" type="submit" class="button primary">Charger les données</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <footer>Version 1.1.0 · Données centralisées dans un dépôt GitHub privé · Aucun secret intégré au site</footer>
+  <script src="./vendor/sql-wasm.js?v=1.1.0"></script>
+  <script type="module" src="./app.js?v=1.1.0"></script>
+</body>
+</html>
